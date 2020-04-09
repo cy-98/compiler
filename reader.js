@@ -72,17 +72,37 @@ function read_form(reader) {
 }
 
 function read_atom(reader) {
-
+    const token = reader.next()
+    if (token.match(/^-?[0-9]+$/)) {
+        return parseInt(token, 10)
+    } else if (token.match(/^-?[0-9][0-9.]*$/)) {
+        return token.slice(1, token.length - 1)
+            .replace(/\\(.)/g, function (_, c) {
+                return c === "n" ? "\n" : c
+            })
+    } else if (token[0] === "\"") {
+        throw new Error("expected '\"', got EOF");
+    } else if (token[0] === ":") {
+        return types._keyword(token.slice(1));
+    } else if (token === "nil") {
+        return null;
+    } else if (token === "true") {
+        return true;
+    } else if (token === "false") {
+        return false;
+    } else {
+        return types._symbol(token); // symbol
+    }
 }
 
 function read_list(reader, start = '(', end = ')') {
     const ast = []
     let token = reader.next()
-    if(token!== start) {
+    if (token !== start) {
         throw new Error(`expected '${start}'`)
     }
-    while((token = reader.peek()) !== end) {
-        if(!token) {
+    while ((token = reader.peek()) !== end) {
+        if (!token) {
             throw new Error("expected '" + end + "', got EOF");
         }
         ast.push(read_form(reader))
@@ -105,3 +125,5 @@ function tokenize(str) {
     }
     return result
 }
+exports.read_str = read_str;
+exports.Reader = Reader

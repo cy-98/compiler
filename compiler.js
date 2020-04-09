@@ -1,6 +1,6 @@
 const { read_str, Reader } = require('./reader')
 const types = require('./types')
-const env = require('./repl_env').reply_env
+const Env = require('./repl_env').Env
 
 function READ(str) {
     const AST = read_str(str)
@@ -16,16 +16,41 @@ function EVAL(ast, env) {
         if (!types._list_Q(ast)) {
             return eval_ast(ast, env)
         }
-        const el = eval_ast(ast, env),
-            f = el[0]
-        return f.apply(f, el.slice(1))
+        const a0 = ast[0], a1 = ast[1], a2 = ast[2], a3 = ast[3]
+        switch(a0.value) {
+        case "def!": 
+            const res = EVAL(a2,env)
+            return env.set(a1, res)
+        case "let*":
+            const let_env = new Env(env)
+            for (var i=0; i < a1.length; i+=2) {
+                let_env.set(a1[i], EVAL(a1[i+1], let_env));
+            }
+            return EVAL(a2, let_env);
+        case "if":
+            const cond = EVAL(a1, env)
+            if( cond === null || cond === false) {
+                return typeof a3 !== "undefined"
+            }else {
+                return EVAL(a2, env)
+            }
+        case "fn*":
+            return function(){
+                return EVAL(a2, new Env(env, a1, arguments))
+            }
+        case "do":
+            const el = eval_ast(ast.slice(1), env)
+            return el[el.length - 1]
+        default: 
+            const el = eval_ast(ast, env),
+                fn = el[0]
+                return fn(el.slice(1))
+        }
     }
 
     function eval_ast(ast, env) {
         if (types._symbol_Q(ast)) {
-            if (ast in env) {
-                return env[ast];
-            } else { throw new Error("'" + ast.value + "' not found"); }
+           return env.get(ast)
         } else if (types._list_Q(ast)) {
             return ast.map(function (a) { return EVAL(a, env); });
         } else if (types._vector_Q(ast)) {
@@ -50,6 +75,12 @@ function PRINT(exp) {
 }
 
 const lists = ``
+const reply_env = new Env()
+
+reply_env.set(types._symbol('+'), (a,b)=> a+b)
+reply_env.set(types._symbol('-'), (a,b)=> a-b)
+reply_env.set(types._symbol('*'), (a,b)=> a*b)
+reply_env.set(types._symbol('/'), (a,b)=> a/b)
 
 PRINT(
     EVAL(
