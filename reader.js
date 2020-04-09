@@ -15,55 +15,83 @@ class Reader {
 
 function read_str(str) {
     const tokens = tokenize(str)
-    if(tokens.length === 0) { throw new BlankException()}
+    if (tokens.length === 0) {
+        throw new BlankException()
+    }
     return read_form(new Reader(tokens))
 }
 
 
-function read_form(reader){
+function read_form(reader) {
     let token = reader.peek()
-    switch(token) { 
-        case ';' :  return null   // lisp 's comments
-        case '\'': reader.next()
-                    return [types._symbol('quote'), read_form(reader)]
-        case '`' : reader.next()
-                    return [types._symbol('quasiquote'), read_form(reader)]
-        case '~' : reader.next()
-                    return [types._symbol('unquote'), read_form(reader)]
-        case '~@': reader.next();
-                    return [types._symbol('splice-unquote'), read_form(reader)];
-        case '^' : reader.next();
-                    var meta = read_form(reader);
-                    return [types._symbol('with-meta'), read_form(reader), meta];
-        case '@' : reader.next();
-                    return [types._symbol('deref'), read_form(reader)];
-        
-        // list
-        case ')': throw new Error("unexpected ')'");
-        case '(': return read_list(reader);
-        
-        // vector   维度为1的数组
-        case ']': throw new Error("unexpected");
-        case '(': return read_list(reader);
+    switch (token) {
+        case ';':
+            return null // lisp 's comments
+        case '\'':
+            reader.next()
+            return [types._symbol('quote'), read_form(reader)] // 转化为[key, expr] => [key,[key,expr]]
+        case '`':
+            reader.next()
+            return [types._symbol('quasiquote'), read_form(reader)]
+        case '~':
+            reader.next()
+            return [types._symbol('unquote'), read_form(reader)]
+        case '~@':
+            reader.next();
+            return [types._symbol('splice-unquote'), read_form(reader)];
+        case '^':
+            reader.next();
+            var meta = read_form(reader);
+            return [types._symbol('with-meta'), read_form(reader), meta];
+        case '@':
+            reader.next();
+            return [types._symbol('deref'), read_form(reader)];
 
-        // hash-map
-        case '}': throw new Error("unexpected '}'");
-        case '{': return read_vector(reader);
+            // list
+        case ')':
+            throw new Error("unexpected ')'");
+        case '(':
+            return read_list(reader);
 
-        // atom
-        default : return read_atom(reader);
-        }   
+            // vector   维度为1的数组
+        case ']':
+            throw new Error("unexpected");
+        case '(':
+            return read_list(reader);
+
+            // hash-map
+        case '}':
+            throw new Error("unexpected '}'");
+        case '{':
+            return read_vector(reader);
+
+            // atom
+        default:
+            return read_atom(reader);
+    }
 }
 
 function read_atom(reader) {
 
 }
 
-function read_list() {
-
+function read_list(reader, start = '(', end = ')') {
+    const ast = []
+    let token = reader.next()
+    if(token!== start) {
+        throw new Error(`expected '${start}'`)
+    }
+    while((token = reader.peek()) !== end) {
+        if(!token) {
+            throw new Error("expected '" + end + "', got EOF");
+        }
+        ast.push(read_form(reader))
+    }
+    reader.next()
+    return ast
 }
 
-function BlankException(msg){}
+function BlankException(msg) {}
 
 function tokenize(str) {
     const re = /[\s,]*(~@|[\[\]{}()'`~^@]|"(?:\\.|[^\\"])*"?|;.*|[^\s\[\]{}('"`,;)]*)/g;
